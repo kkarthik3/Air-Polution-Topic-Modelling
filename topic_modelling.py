@@ -29,47 +29,50 @@ soup1 = BeautifulSoup(response1.content, 'html.parser')
 content1 = soup1.find('div',class_='grey-text').text
 data.append(content1)
 
-import pandas as pd
-df=pd.DataFrame({"Article":data})
-
-!pip install -q num2words
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+# Import necessary libraries
+import gensim
+from gensim import corpora
+import pyLDAvis.gensim_models
+import matplotlib.pyplot as plt
 from nltk.stem import WordNetLemmatizer
-from nltk.stem.porter import PorterStemmer
-import string
-import re
-from num2words import num2words
-
+from nltk.corpus import stopwords
+import nltk
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
-def preprocess(text):
-
-    # Convert text to lowercase
-    text = text.lower()
-
-    # Remove punctuation
-    text = text.translate(str.maketrans("", "", string.punctuation))
-
-    # Tokenize text
-    tokens = word_tokenize(text)
+# Define a function for topic modeling
+def topic_modeling(text, num_topics=5, num_words=10):
+    # Tokenize the text
+    text_tokens = gensim.utils.simple_preprocess(text, deacc=True, min_len=3)
+    print(text_tokens)
     
     # Remove stopwords
     stop_words = set(stopwords.words('english'))
-    filtered_tokens = [token for token in tokens if token not in stop_words]
+    filtered_tokens = [token for token in text_tokens if token not in stop_words]
 
     # Lemmatize words
     lemmatizer = WordNetLemmatizer()
     lemmatized_tokens = [lemmatizer.lemmatize(token) for token in filtered_tokens]
-    
-    # Join tokens back into a string
-    preprocessed_text = ' '.join(lemmatized_tokens)
-    
-    return preprocessed_text
 
-df['Preprocessed'] = df['Article'].apply(preprocess)
-df
+    # Create a dictionary from the tokenized text
+    dictionary = corpora.Dictionary([lemmatized_tokens])
+    
+    # Create a bag of words from the dictionary
+    bow_corpus = [dictionary.doc2bow(lemmatized_tokens)]
+    
+    # Train the LDA model
+    lda_model = gensim.models.LdaModel(bow_corpus, num_topics=num_topics, id2word=dictionary, passes=10)
+    
+    # Print the top words for each topic
+    for idx, topic in lda_model.print_topics(num_topics=num_topics, num_words=num_words):
+        print("Topic: {} \nWords: {}".format(idx, topic))
+    
+    # Visualize the topics
+    pyLDAvis.enable_notebook()
+    vis = pyLDAvis.gensim_models.prepare(lda_model, bow_corpus, dictionary, R=30)
+    return vis
+
+# Perform topic modeling and visualization
+topic_modeling(content)
